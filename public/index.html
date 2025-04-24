@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>App de Tareas</title>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+
+<body>
+    <h1>Tareas en Tiempo Real</h1>
+    <input id="input" placeholder="Nueva tarea" />
+    <button onclick="crear()">Agregar</button>
+    <ul id="lista"></ul>
+
+    <script>
+        const socket = io();
+        const input = document.getElementById('input');
+        const lista = document.getElementById('lista');
+
+        let tareas = [];
+
+        socket.on('tareasIniciales', data => {
+            tareas = data;
+            render();
+        });
+
+        socket.on('tareaCreada', tarea => {
+            tareas.push(tarea);
+            render();
+        });
+
+        socket.on('tareaActualizada', tarea => {
+            tareas = tareas.map(t => t._id === tarea._id ? tarea : t);
+            render();
+        });
+
+        socket.on('tareaEliminada', id => {
+            tareas = tareas.filter(t => t._id !== id);
+            render();
+        });
+
+        function crear() {
+            const texto = input.value;
+            if (!texto) return;
+            socket.emit('crearTarea', { texto, completada: false });
+            input.value = '';
+        }
+
+        function render() {
+            lista.innerHTML = '';
+            tareas.forEach(t => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+          <input type="checkbox" ${t.completada ? 'checked' : ''} onchange="toggle('${t._id}')">
+          <input type="text" value="${t.texto}" onchange="editarTexto('${t._id}', this.value)">
+          <button onclick="eliminar('${t._id}')">X</button>
+        `;
+                lista.appendChild(li);
+            });
+        }
+
+        function toggle(id) {
+            const tarea = tareas.find(t => t._id === id);
+            socket.emit('editarTarea', { ...tarea, completada: !tarea.completada });
+        }
+
+
+        function editarTexto(id, nuevoTexto) {
+            const tarea = tareas.find(t => t._id === id);
+            socket.emit('editarTarea', { ...tarea, texto: nuevoTexto });
+        }
+
+        function eliminar(id) {
+            socket.emit('eliminarTarea', id);
+        }
+    </script>
+</body>
+
+</html>
